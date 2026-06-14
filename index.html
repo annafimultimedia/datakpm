@@ -166,6 +166,25 @@
     }
 
     document.getElementById('btn-download').onclick = () => {
+        const keysmP = Object.keys(mP);
+        if (keysmP.length === 0) return;
+
+        // --- DINAMISASI NAMA FILE ---
+        // 1. Ambil nama pendamping dari data pengurus pertama
+        const firstKey = keysmP[0];
+        let namaPendamping = mP[firstKey].nama_sdm || "DANI MUSTAQIM"; // Fallback ke default jika tidak ditemukan field nama_sdm
+        
+        // 2. Ambil periode bansos dari data pengurus pertama
+        let periodeBansos = mP[firstKey].periode_bansos || "DATA PKH";
+
+        // Bersihkan data teks (jadikan Uppercase dan hilangkan spasi berlebih)
+        namaPendamping = namaPendamping.toString().trim().toUpperCase();
+        periodeBansos = periodeBansos.toString().trim().toUpperCase();
+
+        // Susun format nama file sesuai target: NAMA AKUN_DATA [PERIODE_BANSOS].xlsx
+        const namaFileExcel = `${namaPendamping}_DATA ${periodeBansos}.xlsx`;
+        // -----------------------------
+
         const headerStyle = { 
             font: { bold: true, color: { rgb: "FFFFFF" } }, 
             fill: { fgColor: { rgb: "2980B9" } }, 
@@ -176,10 +195,9 @@
         const rows = [cols.map(c => ({ v: c, s: headerStyle }))];
         let noX = 1;
 
-        Object.keys(mP).forEach(id => {
+        keysmP.forEach(id => {
             const p = mP[id], arts = mA[id] || [];
             
-            // Konfigurasi zebra row untuk Excel
             const bgColor = (noX % 2 === 0) ? "F2F7FB" : "FFFFFF";
             const rowStyle = { 
                 fill: { fgColor: { rgb: bgColor } },
@@ -207,7 +225,9 @@
         XLSX.utils.sheet_add_aoa(ws, rows);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "DATA_PKH");
-        XLSX.writeFile(wb, `DATA_KPM_PKH_${new Date().getTime()}.xlsx`);
+        
+        // Simpan file menggunakan nama dinamis yang sudah dibuat
+        XLSX.writeFile(wb, namaFileExcel);
     };
 </script>
 </body>
