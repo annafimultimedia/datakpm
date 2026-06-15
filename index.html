@@ -51,7 +51,7 @@
 
     <div class="table-wrapper" id="preview-area" style="display:none;">
         <table>
-            <head id="thead"></head>
+            <thead id="thead"></thead>
             <tbody id="tbody"></tbody>
         </table>
     </div>
@@ -59,12 +59,11 @@
 
 <script>
     let mP = {}, mA = {}, mS = {};
-    // State baru untuk menyimpan nama file asli secara global
     window.uploadedFileName = ""; 
 
     const cols = ["NO", "NO KK", "NIK", "NAMA", "KOMPONEN", "DTSEN JENJANG", "DTSEN SEKOLAH", "DTSEN KIP", "DTSEN MSG", "DAPODIK JENJANG", "DAPODIK SEKOLAH", "DAPODIK KIP", "DAPODIK MSG", "ALAMAT", "RT", "RW", "DESA/KEL", "KECAMATAN", "STATUS", "PERIODE"];
     
-    const toU = (v) => (v && v !== "-" && v !== "null") ? v.toString().toUpperCase() : "-";
+    const toU = (v) => (v && v !== "-" && v !== "null" && v !== undefined) ? v.toString().toUpperCase() : "-";
     const padZero = (v) => {
         if (!v || v === "-" || v === "null") return "-";
         let s = v.toString().trim();
@@ -78,7 +77,6 @@
         e.preventDefault();
         const files = Array.from(e.dataTransfer.files);
         for (const f of files) {
-            // Simpan nama file pengurus yang di-drop ke variabel global
             if (f.name.toUpperCase().includes("PENGURUS")) {
                 window.uploadedFileName = f.name;
             }
@@ -87,25 +85,33 @@
             try {
                 const j = JSON.parse(t);
                 const d = j.data || (Array.isArray(j) ? j : []);
+                
                 d.forEach(i => {
-                    // Pengecekan file sekolah, membaca properti di luar maupun di dalam sub-objek 'data'
-                    if (i.nik_art_sekolah || (i.data && (i.data.dapodikMessage || i.data.dtsenMessage))) {
+                    // 1. IDENTIFIKASI FILE DETAIL SEKOLAH
+                    if (i.nik_art_sekolah || (i.data && (i.data.dtsenNamaSekolah || i.data.dapodikNamaSekolah))) {
                         const nikKey = i.nik_art_sekolah || i.nik_anggota_keluarga || i.nik_art;
-                        if(nikKey) {
-                            // Ambil sub-objek 'data' internal jika berstruktur nested, jika tidak ambil objek utama
+                        if (nikKey) {
+                            // AMBIL OBJEK 'data' DI DALAMNYA JIKA ADA NESTED OBJECT
                             mS[nikKey] = i.data ? i.data : i;
                         }
                     } 
+                    // 2. IDENTIFIKASI FILE DATA PENGURUS
                     else if (i.nik_pengurus) {
-                        mP[i.idpeserta_pkh || i.id_komitmen_kpm_pkh] = i;
+                        const id = i.idpeserta_pkh || i.id_komitmen_kpm_pkh;
+                        if (id) mP[id] = i;
                     } 
+                    // 3. IDENTIFIKASI FILE DETAIL ART
                     else if (i.nik_anggota_keluarga) {
                         const id = i.idpeserta_pkh || i.id_komitmen_kpm_pkh;
-                        if (!mA[id]) mA[id] = [];
-                        mA[id].push(i);
+                        if (id) {
+                            if (!mA[id]) mA[id] = [];
+                            mA[id].push(i);
+                        }
                     }
                 });
-            } catch (err) {}
+            } catch (err) {
+                console.error("Gagal membaca file JSON:", err);
+            }
         }
         render();
     };
@@ -113,6 +119,9 @@
     function render() {
         const tb = document.getElementById('tbody');
         const th = document.getElementById('thead');
+        
+        if (!th || !tb) return;
+        
         th.innerHTML = `<tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr>`;
         tb.innerHTML = "";
         
@@ -120,9 +129,13 @@
 
         Object.keys(mP).forEach(id => {
             const p = mP[id], arts = mA[id] || [];
+            
             const processItem = (item, type) => {
-                const nik = item.nik_pengurus || item.nik_anggota_keluarga;
-                const s = mS[nik] || {};
+                const nik = type === 'P' ? item.nik_pengurus : item.nik_anggota_keluarga;
+                
+                // Mengambil referensi data sekolah berdasarkan NIK individu (ART / Pengurus)
+                const s = mS[nik] || {}; 
+                
                 const rawComp = (item.komponen_bantuan || "").toUpperCase().replace(/_/g, " ").replace(/\s+/g, " ");
                 const kDisplay = type === 'P' ? 'PENGURUS' : toU(rawComp);
                 
@@ -160,6 +173,7 @@
                 `;
                 tb.appendChild(tr);
             };
+            
             processItem(p, 'P');
             arts.forEach(a => processItem(a, 'A'));
             noKeluarga++; 
@@ -181,26 +195,20 @@
         const keysmP = Object.keys(mP);
         if (keysmP.length === 0) return;
 
-        // --- AMBIL NAMA DINAMIS DARI FILE YANG DI-DROP ---
-        let namaAkun = "DANI MUSTAQIM"; // default fallback jika tidak terbaca
+        let namaAkun = "DANI MUSTAQIM"; 
 
         if (window.uploadedFileName) {
-            // Memotong ekstensi file dan tulisan '_DATA PENGURUS.json' 
-            // Mengambil teks murni sebelum karakter '_' pertama
             const namaClean = window.uploadedFileName.split('_')[0];
             if (namaClean) {
                 namaAkun = namaClean.trim().toUpperCase();
             }
         }
         
-        // Ambil periode bansos dari data pengurus pertama di JSON
         const firstKey = keysmP[0];
         let periodeBansos = mP[firstKey].periode_bansos || "DATA PKH";
         periodeBansos = periodeBansos.toString().trim().toUpperCase();
 
-        // Gabungkan format akhir file Excel
         const namaFileExcel = `${namaAkun}_DATA ${periodeBansos}.xlsx`;
-        // -------------------------------------------------
 
         const headerStyle = { 
             font: { bold: true, color: { rgb: "FFFFFF" } }, 
@@ -222,7 +230,7 @@
             };
             
             const pushXls = (item, type) => {
-                const nik = item.nik_pengurus || item.nik_anggota_keluarga;
+                const nik = type === 'P' ? item.nik_pengurus : item.nik_anggota_keluarga;
                 const s = mS[nik] || {};
                 const r = [
                     noX, p.nokk, nik, (item.nama_pengurus || item.nama_anggota_keluarga), 
