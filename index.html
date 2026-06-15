@@ -205,7 +205,7 @@
         }
         
         const firstKey = keysmP[0];
-        let periodeBansos = mP[firstKey].periode_bansos || "DATA PKH";
+        let periodeBansos = mP[firstKey].periode_bansos || "DATA VERKOM";
         periodeBansos = periodeBansos.toString().trim().toUpperCase();
 
         const namaFileExcel = `${namaAkun}_DATA ${periodeBansos}.xlsx`;
@@ -249,7 +249,7 @@
         const ws = XLSX.utils.aoa_to_sheet([]);
         XLSX.utils.sheet_add_aoa(ws, rows);
         const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "DATA_PKH");
+        XLSX.utils.book_append_sheet(wb, ws, "DATA_VERKOM");
         
         XLSX.writeFile(wb, namaFileExcel);
     };
