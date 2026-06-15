@@ -59,6 +59,9 @@
 
 <script>
     let mP = {}, mA = {}, mS = {};
+    // State baru untuk menyimpan nama file asli secara global
+    window.uploadedFileName = ""; 
+
     const cols = ["NO", "NO KK", "NIK", "NAMA", "KOMPONEN", "DTSEN JENJANG", "DTSEN SEKOLAH", "DTSEN KIP", "DTSEN MSG", "DAPODIK JENJANG", "DAPODIK SEKOLAH", "DAPODIK KIP", "DAPODIK MSG", "ALAMAT", "RT", "RW", "DESA/KEL", "KECAMATAN", "STATUS", "PERIODE"];
     
     const toU = (v) => (v && v !== "-" && v !== "null") ? v.toString().toUpperCase() : "-";
@@ -75,6 +78,11 @@
         e.preventDefault();
         const files = Array.from(e.dataTransfer.files);
         for (const f of files) {
+            // Simpan nama file pengurus yang di-drop ke variabel global
+            if (f.name.toUpperCase().includes("PENGURUS")) {
+                window.uploadedFileName = f.name;
+            }
+
             const t = await f.text();
             try {
                 const j = JSON.parse(t);
@@ -169,21 +177,26 @@
         const keysmP = Object.keys(mP);
         if (keysmP.length === 0) return;
 
-        // --- DINAMISASI NAMA FILE ---
-        // 1. Ambil nama pendamping dari data pengurus pertama
-        const firstKey = keysmP[0];
-        let namaPendamping = mP[firstKey].nama_sdm || "DANI MUSTAQIM"; // Fallback ke default jika tidak ditemukan field nama_sdm
-        
-        // 2. Ambil periode bansos dari data pengurus pertama
-        let periodeBansos = mP[firstKey].periode_bansos || "DATA PKH";
+        // --- AMBIL NAMA DINAMIS DARI FILE YANG DI-DROP ---
+        let namaAkun = "DANI MUSTAQIM"; // default fallback jika tidak terbaca
 
-        // Bersihkan data teks (jadikan Uppercase dan hilangkan spasi berlebih)
-        namaPendamping = namaPendamping.toString().trim().toUpperCase();
+        if (window.uploadedFileName) {
+            // Memotong ekstensi file dan tulisan '_DATA PENGURUS.json' 
+            // Mengambil teks murni sebelum karakter '_' pertama
+            const namaClean = window.uploadedFileName.split('_')[0];
+            if (namaClean) {
+                namaAkun = namaClean.trim().toUpperCase();
+            }
+        }
+        
+        // Ambil periode bansos dari data pengurus pertama di JSON
+        const firstKey = keysmP[0];
+        let periodeBansos = mP[firstKey].periode_bansos || "DATA PKH";
         periodeBansos = periodeBansos.toString().trim().toUpperCase();
 
-        // Susun format nama file sesuai target: NAMA AKUN_DATA [PERIODE_BANSOS].xlsx
-        const namaFileExcel = `${namaPendamping}_DATA ${periodeBansos}.xlsx`;
-        // -----------------------------
+        // Gabungkan format akhir file Excel
+        const namaFileExcel = `${namaAkun}_DATA ${periodeBansos}.xlsx`;
+        // -------------------------------------------------
 
         const headerStyle = { 
             font: { bold: true, color: { rgb: "FFFFFF" } }, 
@@ -226,7 +239,6 @@
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "DATA_PKH");
         
-        // Simpan file menggunakan nama dinamis yang sudah dibuat
         XLSX.writeFile(wb, namaFileExcel);
     };
 </script>
