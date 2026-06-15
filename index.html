@@ -51,7 +51,7 @@
 
     <div class="table-wrapper" id="preview-area" style="display:none;">
         <table>
-            <thead id="thead"></thead>
+            <head id="thead"></head>
             <tbody id="tbody"></tbody>
         </table>
     </div>
@@ -88,9 +88,13 @@
                 const j = JSON.parse(t);
                 const d = j.data || (Array.isArray(j) ? j : []);
                 d.forEach(i => {
-                    if (i.nik_art_sekolah || i.dapodikMessage || i.dtsenMessage) {
+                    // Pengecekan file sekolah, membaca properti di luar maupun di dalam sub-objek 'data'
+                    if (i.nik_art_sekolah || (i.data && (i.data.dapodikMessage || i.data.dtsenMessage))) {
                         const nikKey = i.nik_art_sekolah || i.nik_anggota_keluarga || i.nik_art;
-                        if(nikKey) mS[nikKey] = i;
+                        if(nikKey) {
+                            // Ambil sub-objek 'data' internal jika berstruktur nested, jika tidak ambil objek utama
+                            mS[nikKey] = i.data ? i.data : i;
+                        }
                     } 
                     else if (i.nik_pengurus) {
                         mP[i.idpeserta_pkh || i.id_komitmen_kpm_pkh] = i;
