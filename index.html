@@ -59,10 +59,12 @@
 
 <script>
     let mP = {}, mA = {}, mS = {};
-    window.uploadedFileName = ""; 
+    window.uploadedFileName = "";
+    window.pendampingName = "USER";
 
-    const cols = ["NO", "NO KK", "NIK", "NAMA", "KOMPONEN", "DTSEN JENJANG", "DTSEN SEKOLAH", "DTSEN KIP", "DTSEN MSG", "DAPODIK JENJANG", "DAPODIK SEKOLAH", "DAPODIK KIP", "DAPODIK MSG", "ALAMAT", "RT", "RW", "DESA/KEL", "KECAMATAN", "STATUS", "PERIODE"];
+    const cols = ["NO", "NO KK", "NIK", "NAMA", "KOMPONEN", "DTSEN JENJANG", "DTSEN SEKOLAH", "DTSEN KIP", "DTSEN MSG", "DAPODIK JENJANG", "DAPODIK SEKOLAH", "DAPODIK KIP", "DAPODIK MSG", "ALAMAT", "RT", "RW", "DESA/KEL", "KECAMATAN", "STATUS", "PERIODE", "PENDAMPING"];
     
+    const normalizeNik = (v) => String(v ?? "").replace(/\.0$/, "").replace(/\D/g, "").trim();
     const toU = (v) => (v && v !== "-" && v !== "null" && v !== undefined) ? v.toString().toUpperCase() : "-";
     const padZero = (v) => {
         if (!v || v === "-" || v === "null") return "-";
@@ -79,6 +81,11 @@
         for (const f of files) {
             if (f.name.toUpperCase().includes("PENGURUS")) {
                 window.uploadedFileName = f.name;
+                window.pendampingName = f.name
+                    .replace(/_DATA[ _]PENGURUS(?:\.JSON)?$/i, "")
+                    .replace(/_/g, " ")
+                    .trim()
+                    .toUpperCase() || "USER";
             }
 
             const t = await f.text();
@@ -89,7 +96,7 @@
                 d.forEach(i => {
                     // 1. IDENTIFIKASI FILE DETAIL SEKOLAH
                     if (i.nik_art_sekolah || (i.data && (i.data.dtsenNamaSekolah || i.data.dapodikNamaSekolah))) {
-                        const nikKey = i.nik_art_sekolah || i.nik_anggota_keluarga || i.nik_art;
+                        const nikKey = normalizeNik(i.nik_art_sekolah || i.nik_anggota_keluarga || i.nik_art);
                         if (nikKey) {
                             // AMBIL OBJEK 'data' DI DALAMNYA JIKA ADA NESTED OBJECT
                             mS[nikKey] = i.data ? i.data : i;
@@ -131,10 +138,17 @@
             const p = mP[id], arts = mA[id] || [];
             
             const processItem = (item, type) => {
-                const nik = type === 'P' ? item.nik_pengurus : item.nik_anggota_keluarga;
+                const nik = normalizeNik(type === 'P' ? item.nik_pengurus : item.nik_anggota_keluarga);
                 
                 // Mengambil referensi data sekolah berdasarkan NIK individu (ART / Pengurus)
-                const s = mS[nik] || {}; 
+                const detailSekolah = mS[nik] || {};
+                const s = {
+                    ...detailSekolah,
+                    dtsenJenjangPendidikan: detailSekolah.dtsenJenjangPendidikan || item.tingkat_pendidikan,
+                    dtsenNamaSekolah: detailSekolah.dtsenNamaSekolah || item.nama_sekolah,
+                    dapodikJenjangPendidikan: detailSekolah.dapodikJenjangPendidikan || item.tingkat_pendidikan,
+                    dapodikNamaSekolah: detailSekolah.dapodikNamaSekolah || item.nama_sekolah
+                };
                 
                 const rawComp = (item.komponen_bantuan || "").toUpperCase().replace(/_/g, " ").replace(/\s+/g, " ");
                 const kDisplay = type === 'P' ? 'PENGURUS' : toU(rawComp);
@@ -170,6 +184,7 @@
                     <td>${toU(p.kecamatan)}</td>
                     <td>${toU(p.nama_periode)}</td>
                     <td>${toU(p.periode_bansos)}</td>
+                    <td>${toU(window.pendampingName)}</td>
                 `;
                 tb.appendChild(tr);
             };
@@ -195,10 +210,10 @@
         const keysmP = Object.keys(mP);
         if (keysmP.length === 0) return;
 
-        let namaAkun = "DANI MUSTAQIM"; 
+        let namaAkun = window.pendampingName || "USER";
 
         if (window.uploadedFileName) {
-            const namaClean = window.uploadedFileName.split('_')[0];
+            const namaClean = window.pendampingName;
             if (namaClean) {
                 namaAkun = namaClean.trim().toUpperCase();
             }
@@ -230,14 +245,22 @@
             };
             
             const pushXls = (item, type) => {
-                const nik = type === 'P' ? item.nik_pengurus : item.nik_anggota_keluarga;
-                const s = mS[nik] || {};
+                const nik = normalizeNik(type === 'P' ? item.nik_pengurus : item.nik_anggota_keluarga);
+                const detailSekolah = mS[nik] || {};
+                const s = {
+                    ...detailSekolah,
+                    dtsenJenjangPendidikan: detailSekolah.dtsenJenjangPendidikan || item.tingkat_pendidikan,
+                    dtsenNamaSekolah: detailSekolah.dtsenNamaSekolah || item.nama_sekolah,
+                    dapodikJenjangPendidikan: detailSekolah.dapodikJenjangPendidikan || item.tingkat_pendidikan,
+                    dapodikNamaSekolah: detailSekolah.dapodikNamaSekolah || item.nama_sekolah
+                };
                 const r = [
                     noX, p.nokk, nik, (item.nama_pengurus || item.nama_anggota_keluarga), 
                     type === 'P' ? 'PENGURUS' : item.komponen_bantuan?.replace(/_/g,' '), 
                     s.dtsenJenjangPendidikan, s.dtsenNamaSekolah, s.dtsenPenerimaKip, s.dtsenMessage, 
                     s.dapodikJenjangPendidikan, s.dapodikNamaSekolah, s.dapodikPenerimaKip, s.dapodikMessage, 
-                    p.alamat, padZero(p.rt), padZero(p.rw), p.kelurahan, p.kecamatan, p.nama_periode, p.periode_bansos
+                    p.alamat, padZero(p.rt), padZero(p.rw), p.kelurahan, p.kecamatan, p.nama_periode, p.periode_bansos,
+                    window.pendampingName
                 ];
                 rows.push(r.map((v, i) => ({ v: toU(v), t: (i===1 || i===2 || i===14 || i===15) ? 's' : 'v', s: rowStyle })));
             };
